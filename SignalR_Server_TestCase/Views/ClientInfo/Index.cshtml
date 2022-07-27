@@ -1,0 +1,21 @@
+﻿@using SignalR_Server_TestCase.Models
+@model IEnumerable<ClientInfoModel>
+<!DOCTYPE html>
+
+<html>
+    <head>
+
+    </head>
+    <body>
+        <h2>@ViewBag.Head</h2>
+        @{
+            foreach (var item in Model)
+        {
+            <div>
+                <h2>Ip Address: @item.IpAddress</h2>
+                <p>Cpu Usage: @item.CPUUsagePercentage.ToString("P")</p>
+            </div>
+        }
+        }
+    </body>
+</html>
