@@ -4,6 +4,6 @@ namespace SignalR_Server_TestCase.Interfaces
 {
     public interface IAllClients
     {
-        public IEnumerable<ClientInfoModel>? AllClients { get; }
+        public IEnumerable<ClientModel>? AllClients { get; }
     }
 }

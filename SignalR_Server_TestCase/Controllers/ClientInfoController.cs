@@ -1,23 +1,15 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Entities;
+using Microsoft.AspNetCore.Mvc;
 using SignalR_Server_TestCase.Interfaces;
 
 namespace SignalR_Server_TestCase.Controllers
 {
-    public class ClientInfoController : Controller
+    public class ClientController : Controller
     {
-        private readonly IAllClients allClients;
-        private readonly IAllStorages allStorages;
-
-        public ClientInfoController(IAllClients allClients, IAllStorages allStorages)
-        {
-            this.allClients = allClients;
-            this.allStorages = allStorages;
-        }
-
         public IActionResult Index()
         {
-            IEnumerable<Models.ClientInfoModel>? clients = allClients.AllClients;
-            ViewBag.Head = "All Clients";
+            IEnumerable<ClientInfo> clients = new NpgSqlAdapter().GetInfo();
+            ViewBag.Title = "All Clients";
             return View(clients);
         }
     }
