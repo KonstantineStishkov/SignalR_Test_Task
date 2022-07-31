@@ -8,44 +8,94 @@ namespace SignalR_Server_TestCase.Hubs
 {
     public class NotificationHub : Hub
     {
-        const string startServiceMessage = "-start";
-        const string stopServiceMessage = "-stop";
-        const string requestMessage = "Client Info Requested";
+        #region Constants
+        const string startServiceMessage = "start";
+        const string stopServiceMessage = "stop";
+        const string requestMessageFormat = "Client Info Requested. Period = {0}";
         const string successStartMessage = "Service successfully started";
         const string successStopMessage = "Service successfully stopped";
         const string wrongMessage = "No such command";
+        const string acceptedMessage = "Request accepted";
+        #endregion
 
-        List<ClientModel> clients = new List<ClientModel>();
+        List<ClientInfoModel> clients = new List<ClientInfoModel>();
         NpgSqlAdapter sqlAdapter = new NpgSqlAdapter();
 
-        public Task SendMessage(string message)
+        public Task SendMessage(string message, string ip)
         {
+            Clients.Caller.SendAsync("Send", $"Server Message: {acceptedMessage}({message})");
             if (message.Trim() == startServiceMessage)
-                return ProcessServiceStart();
+                return ProcessServiceStart(ip);
 
             if (message.Trim() == stopServiceMessage)
-                return ProcessServiceStop();
+                return ProcessServiceStop(ip);
 
             return Clients.Caller.SendAsync("Send", $"Server Message: {wrongMessage}");
         }
-        public Task SendInfo(ClientInfo info)
+
+        public Task SendInfo(string[] info)
         {
-            ClientModel? client = GetClient();
+            ClientInfoModel client = new ClientInfoModel();
+            client.Info = ComposeClientInfo(info);
+
+            Clients.Caller.SendAsync("Send", $"Client Memory: {client.Info.MemoryUsage} / {client.Info.MemoryTotal}");
+            Clients.Caller.SendAsync("Send", $"Client CPU Usage: {client.Info.CPUUsagePercentage}");
+
+            foreach(var disk in client.Info.Disks)
+            {
+                Clients.Caller.SendAsync("Send", $"Disk: {disk.Literal}:{disk.DiskSpaceAvailable}/{disk.DiskSpaceTotal}");
+            }
+
+            try
+            {
+                sqlAdapter.AddInfo(client.Info);
+            }
+            catch(Exception ex)
+            {
+                Clients.Caller.SendAsync("Send", $"Exception: {ex.Message}");
+            }
             return Task.CompletedTask;
         }
-        private Task ProcessServiceStop()
+
+        private ClientInfo ComposeClientInfo(string[] info)
         {
-            ClientModel client = GetClient();
+            ClientInfo client = new ClientInfo()
+            {
+                IpAddress = info[0],
+                CPUUsagePercentage = info[1],
+                MemoryUsage = info[2],
+                MemoryTotal = info[3],
+            };
+            int startCount = 4;
+            int diskParametersCount = 3;
+            int disksCount = (info.Length - startCount) / diskParametersCount;
+
+            List<Disk> disks = new List<Disk>();
+            for (int i = 0; i < disksCount; i++)
+            {
+                disks.Add(new Disk()
+                {
+                    Literal = info[(diskParametersCount * i) + startCount],
+                    DiskSpaceAvailable = info[(diskParametersCount * i) + 1 + startCount],
+                    DiskSpaceTotal = info[(diskParametersCount * i) + 2 + startCount]
+                });
+            }
+            client.Disks = disks;
+            return client;
+        }
+        public Task ProcessServiceStop(string ip)
+        {
+            ClientInfoModel client = GetClient(Clients.Caller, ip);
             client.IsActive = false;
             client.TokenSource.Cancel();
             sqlAdapter.UpdateClient(client);
 
             return Task.CompletedTask;
         }
-        private Task ProcessServiceStart()
+        public Task ProcessServiceStart(string ip)
         {
-            ClientModel client = GetClient();
-
+            Clients.Caller.SendAsync("Send", $"Server Message: Surveying started");
+            ClientInfoModel client = GetClient(Clients.Caller, ip);
             SendRequests(Clients.Caller, client.TokenSource.Token);
             return Clients.Caller.SendAsync("Send", $"Server Message: {successStartMessage}");
         }
@@ -53,8 +103,8 @@ namespace SignalR_Server_TestCase.Hubs
         {
             while (!token.IsCancellationRequested)
             {
-                client.SendAsync("SendRequest");
-                client.SendAsync("Send", requestMessage);
+                client.SendAsync("SendRequest", OverallInfo.Period.TotalSeconds.ToString());
+                client.SendAsync("Send", string.Format(requestMessageFormat, OverallInfo.Period));
                 await Task.Delay(OverallInfo.Period);
             }
 
@@ -62,20 +112,27 @@ namespace SignalR_Server_TestCase.Hubs
 
             return;
         }
-        private ClientModel GetClient()
+        private ClientInfoModel GetClient(IClientProxy caller, string ip)
         {
-            ClientModel client = clients.Find(x => x.ConnectionId == Context.ConnectionId);
+            ClientInfoModel client = clients.Find(x => x.Info.IpAddress == ip);
             if(client == null)
             {
-                client = new ClientModel()
+                caller.SendAsync("Send", $"Server Message: Creating new user");
+                client = new ClientInfoModel()
                 {
-                    IpAddress = Context.Features.Get<HttpConnectionFeature>().RemoteIpAddress.ToString(),
+                    Info = new ClientInfo()
+                    {
+                        IpAddress = ip
+                    }
+,                   
                     ConnectionId = Context.ConnectionId,
                     IsActive = true,
                     TokenSource = new CancellationTokenSource()
                 };
+                caller.SendAsync("Send", $"Server Message: user created");
                 clients.Add(client);
                 sqlAdapter.AddClient(client);
+                caller.SendAsync("Send", $"Server Message: user saved");
             }
 
             return client;

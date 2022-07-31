@@ -8,7 +8,7 @@ namespace SignalR_Server_TestCase
     public class NpgSqlAdapter
     {
         const string connString = "Host=127.0.0.1;Username=ClientObserver;Password=1989;Database=SignalR_TestServer";
-        public void AddClient(ClientModel client)
+        public void AddClient(ClientInfoModel client)
         {
             const string query = "INSERT INTO public.\"Clients\"(ipaddress, connectionid, isactive) VALUES(($1),($2),($3));";
 
@@ -20,18 +20,25 @@ namespace SignalR_Server_TestCase
                 {
                     Parameters =
                     {
-                        new() { Value = client.IpAddress },
+                        new() { Value = client.Info.IpAddress },
                         new() { Value = client.ConnectionId },
                         new() { Value = client.IsActive }
                     }
                 })
 
                 {
-                    command.ExecuteNonQuery();
+                    try
+                    {
+                        command.ExecuteNonQuery();
+                    }
+                    catch (Exception)
+                    {
+                        UpdateClient(client);
+                    }
                 }
             }
         }
-        public void UpdateClient(ClientModel client)
+        public void UpdateClient(ClientInfoModel client)
         {
             const string query = "UPDATE public.\"Clients\" SET isactive = ($2) WHERE ipaddress = ($1);";
             using (var connection = new NpgsqlConnection(connString))
@@ -42,7 +49,7 @@ namespace SignalR_Server_TestCase
                 {
                     Parameters =
                     {
-                        new() { Value = client.IpAddress },
+                        new() { Value = client.Info.IpAddress },
                         new() { Value = client.IsActive }
                     }
                 })
@@ -52,10 +59,54 @@ namespace SignalR_Server_TestCase
                 }
             }
         }
-
-        public IEnumerable<ClientInfo> GetInfo()
+        public void AddInfo(ClientInfo info)
         {
-            string query = GetQueryString();
+            const string query = "INSERT INTO public.\"ClientInfo\" VALUES(($1),($2),($3),($4),NOW());";
+            
+            using (NpgsqlConnection connection = new NpgsqlConnection(connString))
+            {
+                connection.Open();
+
+                using (var command = new NpgsqlCommand(query, connection)
+                {
+                    Parameters =
+                    {
+                        new() { Value = info.IpAddress },
+                        new() { Value = info.MemoryUsage },
+                        new() { Value = info.MemoryTotal },
+                        new() { Value = info.CPUUsagePercentage }
+                    }
+
+                })
+
+                    command.ExecuteNonQuery();
+
+                foreach (Disk disk in info.Disks)
+                {
+                    AddDiskInfo(disk, connection, info.IpAddress);
+                }
+            }
+        }
+        public void AddDiskInfo(Disk disk, NpgsqlConnection connection, string ip)
+        {
+            const string query = "INSERT INTO public.\"Disks\" VALUES(($1),($2),($3),($4),(SELECT MAX(datetime) FROM public.\"ClientInfo\" WHERE ipaddress = ($1)));";
+
+            using (var command = new NpgsqlCommand(query, connection)
+            {
+                Parameters =
+                    {
+                        new() { Value = ip },
+                        new() { Value = disk.Literal },
+                        new() { Value = disk.DiskSpaceAvailable },
+                        new() { Value = disk.DiskSpaceTotal },
+                }
+            })
+                command.ExecuteNonQuery();
+        }
+
+        public IEnumerable<ClientInfoModel> GetInfo()
+        {
+            string query = "SELECT * FROM public.\"allinfo\";";
 
             using (var connection = new NpgsqlConnection(connString))
             {
@@ -73,7 +124,7 @@ namespace SignalR_Server_TestCase
                         if (info != null && info.IpAddress != ip)
                         {
                             info.Disks = disks;
-                            yield return info;
+                            yield return new ClientInfoModel() { Info = info };
                             info = null;
                         }
 
@@ -81,39 +132,23 @@ namespace SignalR_Server_TestCase
                         {
                             info = new ClientInfo();
                             info.IpAddress = ip;
-                            info.MemoryUsage = (long)reader.GetFloat(1);
-                            info.MemoryTotal = (long)reader.GetFloat(2);
-                            info.CPUUsagePercentage = reader.GetFloat(3);
+                            info.MemoryUsage = reader.GetString(1);
+                            info.MemoryTotal = reader.GetString(2);
+                            info.CPUUsagePercentage = reader.GetString(3);
                             disks = new List<Disk>();
                         }
 
                         disks.Add(new Disk()
                         {
-                            Literal = reader.GetString(4).First(),
-                            DiskSpaceAvailable = reader.GetFloat(5),
-                            DiskSpaceTotal = reader.GetFloat(6)
+                            Literal = reader.GetString(4),
+                            DiskSpaceAvailable = reader.GetString(5),
+                            DiskSpaceTotal = reader.GetString(6)
                         });
                     }
+                    info.Disks = disks;
+                    yield return new ClientInfoModel() { Info = info };
                 }
             }
-        }
-
-        private string GetQueryString()
-        {
-            var stb = new StringBuilder();
-            stb.Append("SELECT \"ClientInfo\".ipaddress, ");
-            stb.Append("memoryusage, ");
-            stb.Append("memorytotal, ");
-            stb.Append("cpuusagepercentage, ");
-            stb.Append("\"Disks\".literal, ");
-            stb.Append("\"Disks\".diskspaceavailable, ");
-            stb.Append("\"Disks\".diskspacetotal ");
-            stb.Append("FROM ( SELECT ipaddress, MAX(datetime) as dat ");
-            stb.Append("FROM public.\"ClientInfo\" GROUP BY ipaddress) as maximum ");
-            stb.Append("INNER JOIN public.\"ClientInfo\" ON maximum.ipaddress = \"ClientInfo\".ipaddress ");
-            stb.Append("AND maximum.dat = \"ClientInfo\".datetime ");
-            stb.Append(" LEFT JOIN \"Disks\" ON \"ClientInfo\".ipaddress = \"Disks\".ipaddress; ");
-            return stb.ToString();
         }
     }
 }

@@ -1,12 +1,5 @@
-﻿using Entities;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Diagnostics;
-using System.Linq;
+﻿using System.Diagnostics;
 using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace SignalR_Client
 {
@@ -23,29 +16,38 @@ namespace SignalR_Client
 
             GetCpuUsage(processes);
         }
-        private void GetClientInfo(double cpuUsage)
+        private async void GetClientInfo(double cpuUsage)
         {
-            ClientInfo client = new ClientInfo();
+            List<string> info = new List<string>();
 
-            client.CPUUsagePercentage = cpuUsage;
-            client.Disks = GetDisksInfo();
+            info.Add(string.Empty);
+            info.Add(cpuUsage.ToString("P"));
 
-            GetMemoryInfo(ref client);
+            try
+            {
+                info.AddRange(GetMemoryInfo());
+                info.AddRange(GetDisksInfo());
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
 
-            OnClientInfoCollected?.Invoke(client);
+            OnClientInfoCollected?.Invoke(info);
         }
 
-        private void GetMemoryInfo(ref ClientInfo client)
+        private List<string> GetMemoryInfo()
         {
             if (IsUnix())
-                GetLinuxMemoryInfo(ref client);
+                return GetLinuxMemoryInfo();
             else
-                GetWindowsMemoryInfo(ref client);
+                return GetWindowsMemoryInfo();
         }
 
-        private static void GetWindowsMemoryInfo(ref ClientInfo client)
+        private List<string> GetWindowsMemoryInfo()
         {
             string output = string.Empty;
+            List<string> result = new List<string>();
 
             ProcessStartInfo info = new ProcessStartInfo();
             info.FileName = "wmic";
@@ -61,31 +63,33 @@ namespace SignalR_Client
             string[] freeMemoryParts = lines[0].Split("=", StringSplitOptions.RemoveEmptyEntries);
             string[] totalMemoryParts = lines[1].Split("=", StringSplitOptions.RemoveEmptyEntries);
 
-            client.MemoryTotal = long.Parse(totalMemoryParts[1]);
-            long freeMemomry = long.Parse(freeMemoryParts[1]);
-            client.MemoryUsage = client.MemoryTotal - freeMemomry;
+            result.Add(ConvertBytesToString(long.Parse(totalMemoryParts[1]) - long.Parse(freeMemoryParts[1]), 1));
+            result.Add(ConvertBytesToString(long.Parse(totalMemoryParts[1]), 1));
+            return result;
         }
 
-        private static void GetLinuxMemoryInfo(ref ClientInfo client)
+        private List<string> GetLinuxMemoryInfo()
         {
-            string? output = string.Empty;
+            string output = string.Empty;
+            List<string> result = new List<string>();
 
-            var info = new ProcessStartInfo("free -m");
+            ProcessStartInfo info = new ProcessStartInfo("free -m");
             info.FileName = "/bin/bash";
             info.Arguments = "-c \"free -m\"";
             info.RedirectStandardOutput = true;
 
-            using (var process = Process.Start(info))
+            using (Process process = Process.Start(info))
             {
                 output = process.StandardOutput.ReadToEnd();
                 Console.WriteLine(output);
             }
 
-            var lines = output.Split("\n");
-            var memory = lines[1].Split(" ", StringSplitOptions.RemoveEmptyEntries);
+            string[] lines = output.Split("\n");
+            string[] memory = lines[1].Split(" ", StringSplitOptions.RemoveEmptyEntries);
 
-            client.MemoryTotal = long.Parse(memory[1]);
-            client.MemoryUsage = long.Parse(memory[2]);
+            result.Add(ConvertBytesToString(long.Parse(memory[2]), 1));
+            result.Add(ConvertBytesToString(long.Parse(memory[1]), 1));
+            return result;
         }
 
         private bool IsUnix()
@@ -94,33 +98,43 @@ namespace SignalR_Client
                           RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
         }
 
-        private IEnumerable<Disk> GetDisksInfo()
+        private List<string> GetDisksInfo()
         {
-            List<Disk> disks = new List<Disk>();
-
+            List<string> result = new List<string>();
             foreach (var drive in DriveInfo.GetDrives())
             {
-                if (drive.DriveType == DriveType.Fixed)
+                if (drive.DriveType == DriveType.Fixed && drive.TotalSize > 0)
                 {
-                    disks.Add(new Disk()
-                    {
-                        Literal = drive.Name.First(),
-                        DiskSpaceAvailable = drive.AvailableFreeSpace,
-                        DiskSpaceTotal = drive.TotalFreeSpace
-                    });
+                    result.Add(drive.Name.Length < 6 ? drive.Name : "None");
+                    result.Add(ConvertBytesToString(drive.AvailableFreeSpace));
+                    result.Add(ConvertBytesToString(drive.TotalSize));
                 }
             }
-
-            return disks;
+            return result;
         }
+        private string ConvertBytesToString(long bytes, int offset = 0)
+        {
+            const int grade = 1024;
+            const int maxGrade = 4;
+            string[] gradeNames = { "bytes", "Kb", "Mb", "Gb", "Tb" };
 
+            int i = 0;
+            decimal result = bytes;
+            while((result > grade) && (i <= maxGrade))
+            {
+                result = result / grade;
+                i++;
+            }
+
+            result = Math.Round(result, 2);
+            return string.Format("{0} {1}", result, gradeNames[i + offset]);
+        }
         private void GetCpuUsage(Process[] processes)
         {
             processesCpuUsage = new double[processes.Length];
 
             for (int i = 0; i < processesCpuUsage.Length; i++)
             {
-                Console.WriteLine(i + "/" + processesCpuUsage.Length + ":" + processes[i].ToString());
                 GetCpuUsageForProcessAsync(processes[i], i, processesCpuUsage.Length);
             }
         }
@@ -166,8 +180,8 @@ namespace SignalR_Client
             try
             {
                 locker.EnterWriteLock();
-                Console.WriteLine(collectedDataCount++);
-                if (collectedDataCount >= targetValue - 1)
+                collectedDataCount++;
+                if (collectedDataCount >= targetValue)
                     return true;
             }
             catch (Exception)

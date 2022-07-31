@@ -2,10 +2,10 @@
 {
     public class ClientInfo
     {
-        public string? IpAddress { get; set; }
-        public long MemoryUsage { get; set; }
-        public long MemoryTotal { get; set; }
-        public double CPUUsagePercentage { get; set; }
+        public string IpAddress { get; set; }
+        public string MemoryUsage { get; set; }
+        public string MemoryTotal { get; set; }
+        public string CPUUsagePercentage { get; set; }
         public Disk? MainDisk
         {
             get

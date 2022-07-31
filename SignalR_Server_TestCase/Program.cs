@@ -1,6 +1,5 @@
 using SignalR_Server_TestCase;
 using SignalR_Server_TestCase.Hubs;
-using SignalR_Server_TestCase.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 

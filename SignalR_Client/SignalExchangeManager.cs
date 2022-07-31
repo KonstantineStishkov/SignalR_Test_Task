@@ -1,5 +1,4 @@
-﻿using Entities;
-using Microsoft.AspNetCore.SignalR.Client;
+﻿using Microsoft.AspNetCore.SignalR.Client;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -11,8 +10,20 @@ namespace SignalR_Client
 {
     internal class SignalExchangeManager
     {
+        #region Constants
+        const string ServerMethodSend = "Send";
+        const string ServerMethodSendRequest = "SendRequest";
+
+        const string MethodSendMessage = "SendMessage";
+        const string ClientMethodSendInfo = "SendInfo";
+        const string messageStart = "start";
+        const string messageStop = "stop";
+        #endregion
+
         private HubConnection hubConnection;
         private SystemInfo systemInfo;
+        private bool hasActiveRequest;
+        private string ip;
 
         internal SignalExchangeManager(string url)
         {
@@ -23,27 +34,38 @@ namespace SignalR_Client
         }
         public async void StartSurveyServiceAsync()
         {
-            hubConnection.On<string>("Send", message => Console.WriteLine(message));
-            hubConnection.On<string>("SendRequest", OnRequestReceived);
+            ip = await new HttpClient().GetStringAsync("https://api.ipify.org");
+
+            hubConnection.On<string>(ServerMethodSend, message => Console.WriteLine(message));
+            hubConnection.On<string>(ServerMethodSendRequest, OnRequestReceived);
 
             await hubConnection.StartAsync();
-            await hubConnection.SendAsync("ProcessServiceStart");
+            Console.WriteLine($"Connection: {hubConnection.State}");
+            hubConnection.SendAsync(MethodSendMessage, messageStart, ip);
         }
         public async void StopSurveyService()
         {
-            hubConnection.Remove("Send");
-            hubConnection.Remove("SendRequest");
-            await hubConnection.SendAsync("ProcessServiceStop");
+            hubConnection.Remove(ServerMethodSend);
+            hubConnection.Remove(ServerMethodSendRequest);
+            await hubConnection.SendAsync(MethodSendMessage, messageStop, ip);
         }
         public void OnRequestReceived(string request)
         {
+            hasActiveRequest = true;
+            Console.WriteLine($"Request Recieved. Period = {request}");
             systemInfo.OnClientInfoCollected += SendClientInfo;
             systemInfo.StartCollectingClientInfo();
         }
-        private void SendClientInfo(ClientInfo client)
+        private void SendClientInfo(IEnumerable<string> info)
         {
-            hubConnection.SendAsync("SendInfo", client);
-            systemInfo.OnClientInfoCollected -= SendClientInfo;
+            if (hasActiveRequest)
+            {
+                hasActiveRequest = false;
+                string[] arr = info.ToArray();
+                arr[0] = ip;
+                hubConnection.SendAsync(ClientMethodSendInfo, arr);
+                systemInfo.OnClientInfoCollected -= SendClientInfo;
+            }
         }
     }
 }

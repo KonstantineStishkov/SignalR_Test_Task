@@ -8,8 +8,8 @@ namespace Entities
 {
     public class Disk
     {
-        public char Literal { get; set; }
-        public float DiskSpaceAvailable { get; set; }
-        public float DiskSpaceTotal { get; set; }
+        public string Literal { get; set; }
+        public string DiskSpaceAvailable { get; set; }
+        public string DiskSpaceTotal { get; set; }
     }
 }

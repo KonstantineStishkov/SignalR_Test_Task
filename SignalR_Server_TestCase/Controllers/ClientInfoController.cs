@@ -1,14 +1,14 @@
 ﻿using Entities;
 using Microsoft.AspNetCore.Mvc;
-using SignalR_Server_TestCase.Interfaces;
+using SignalR_Server_TestCase.Models;
 
 namespace SignalR_Server_TestCase.Controllers
 {
-    public class ClientController : Controller
+    public class ClientInfoController : Controller
     {
         public IActionResult Index()
         {
-            IEnumerable<ClientInfo> clients = new NpgSqlAdapter().GetInfo();
+            IEnumerable<ClientInfoModel> clients = new NpgSqlAdapter().GetInfo();
             ViewBag.Title = "All Clients";
             return View(clients);
         }

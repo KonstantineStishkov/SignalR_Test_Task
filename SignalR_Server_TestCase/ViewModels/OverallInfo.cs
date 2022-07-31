@@ -2,6 +2,6 @@
 {
     public class OverallInfo
     {
-        public static TimeSpan Period { get; set; }
+        public static TimeSpan Period { get; set; } = TimeSpan.FromSeconds(30);
     }
 }

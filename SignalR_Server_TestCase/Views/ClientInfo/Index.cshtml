@@ -1,5 +1,5 @@
 ﻿@using SignalR_Server_TestCase.Models
-@model IEnumerable<ClientModel>
+@model IEnumerable<ClientInfoModel>
 <!DOCTYPE html>
 
 <html>
@@ -22,18 +22,18 @@
             foreach (var client in Model)
             {
                 <tr>
-                    <td rowspan="@client.Disks.Count()">@client.IpAddress</td>
-                    <td rowspan="@client.Disks.Count()">@string.Format("{0}/{1}", client.MemoryUsage, client.MemoryTotal)</td>
-                    <td rowspan="@client.Disks.Count()">@client.CPUUsagePercentage.ToString("P")</td>
-                    <td>@client.MainDisk.Literal</td>
-                    <td>@string.Format("{0}/{1}", client.MainDisk.DiskSpaceAvailable, client.MainDisk.DiskSpaceTotal)</td>
+                    <td rowspan="@client.Info.Disks.Count()">@client.Info.IpAddress</td>
+                    <td rowspan="@client.Info.Disks.Count()">@string.Format("{0}/{1}", client.Info.MemoryUsage, client.Info.MemoryTotal)</td>
+                    <td rowspan="@client.Info.Disks.Count()">@client.Info.CPUUsagePercentage</td>
+                    <td>@client.Info.MainDisk.Literal</td>
+                    <td>@string.Format("{0}/{1}", client.Info.MainDisk.DiskSpaceAvailable, client.Info.MainDisk.DiskSpaceTotal)</td>
                 </tr>
 
-                if (client.Disks.Count() < 2)
+                if (client.Info.Disks.Count() < 2)
                     continue;
 
                 bool isFirst = true;
-                foreach (var disk in client.Disks)
+                foreach (var disk in client.Info.Disks)
                 {
                     if (isFirst)
                     {

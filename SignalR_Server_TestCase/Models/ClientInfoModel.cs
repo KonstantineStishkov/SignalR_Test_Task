@@ -1,13 +1,20 @@
-﻿using SignalR_Server_TestCase.Interfaces;
+﻿using Entities;
+using System.Linq;
 
 namespace SignalR_Server_TestCase.Models
 {
     public class ClientInfoModel
     {
-        public string? IpAddress { get; set; }
-        public float MemoryUsage { get; set; }
-        public float MemoryTotal { get; set; }
-        public float CPUUsagePercentage { get; set; }
-        public IEnumerable<StorageDeviceModel> Disks { get; set; }
+        public ClientInfo Info { get; set; }
+        public string ConnectionId { get; set; }
+        public bool IsActive { get; set; }
+        public CancellationTokenSource TokenSource { get; set; }
+        //public ClientInfoModel(Client client, string connectionId, bool isActive, CancellationToken token)
+        //{
+        //    Client = client;
+        //    ConnectionId = connectionId;
+        //    IsActive = isActive;
+        //    Token = token;
+        //}
     }
 }
