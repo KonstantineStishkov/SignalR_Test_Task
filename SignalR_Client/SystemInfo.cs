@@ -87,8 +87,8 @@ namespace SignalR_Client
             string[] lines = output.Split("\n");
             string[] memory = lines[1].Split(" ", StringSplitOptions.RemoveEmptyEntries);
 
-            result.Add(ConvertBytesToString(long.Parse(memory[2]), 1));
-            result.Add(ConvertBytesToString(long.Parse(memory[1]), 1));
+            result.Add(ConvertBytesToString(long.Parse(memory[2]), 2));
+            result.Add(ConvertBytesToString(long.Parse(memory[1]), 2));
             return result;
         }
 
