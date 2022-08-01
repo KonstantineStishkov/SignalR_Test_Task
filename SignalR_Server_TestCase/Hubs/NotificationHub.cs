@@ -2,7 +2,6 @@
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.SignalR;
 using SignalR_Server_TestCase.Models;
-using SignalR_Server_TestCase.ViewModels;
 
 namespace SignalR_Server_TestCase.Hubs
 {
