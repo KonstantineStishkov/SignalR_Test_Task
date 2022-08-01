@@ -1,7 +1,6 @@
 ﻿using Entities;
 using Npgsql;
 using SignalR_Server_TestCase.Models;
-using System.Text;
 
 namespace SignalR_Server_TestCase
 {

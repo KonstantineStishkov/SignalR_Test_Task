@@ -1,5 +1,4 @@
 ﻿using Entities;
-using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.SignalR;
 using SignalR_Server_TestCase.Models;
 
@@ -10,7 +9,6 @@ namespace SignalR_Server_TestCase.Hubs
         #region Constants
         const string startServiceMessage = "start";
         const string stopServiceMessage = "stop";
-        const string requestMessageFormat = "Client Info Requested. Period = {0}";
         const string successStartMessage = "Service successfully started";
         const string successStopMessage = "Service successfully stopped";
         const string wrongMessage = "No such command";
@@ -40,7 +38,7 @@ namespace SignalR_Server_TestCase.Hubs
             Clients.Caller.SendAsync("Send", $"Client Memory: {client.Info.MemoryUsage} / {client.Info.MemoryTotal}");
             Clients.Caller.SendAsync("Send", $"Client CPU Usage: {client.Info.CPUUsagePercentage}");
 
-            foreach(var disk in client.Info.Disks)
+            foreach(Disk disk in client.Info.Disks)
             {
                 Clients.Caller.SendAsync("Send", $"Disk: {disk.Literal}:{disk.DiskSpaceAvailable}/{disk.DiskSpaceTotal}");
             }
@@ -82,7 +80,7 @@ namespace SignalR_Server_TestCase.Hubs
             client.Disks = disks;
             return client;
         }
-        public Task ProcessServiceStop(string ip)
+        private Task ProcessServiceStop(string ip)
         {
             ClientInfoModel client = GetClient(Clients.Caller, ip);
             client.IsActive = false;
@@ -91,7 +89,7 @@ namespace SignalR_Server_TestCase.Hubs
 
             return Task.CompletedTask;
         }
-        public Task ProcessServiceStart(string ip)
+        private Task ProcessServiceStart(string ip)
         {
             Clients.Caller.SendAsync("Send", $"Server Message: Surveying started");
             ClientInfoModel client = GetClient(Clients.Caller, ip);
@@ -103,7 +101,6 @@ namespace SignalR_Server_TestCase.Hubs
             while (!token.IsCancellationRequested)
             {
                 client.SendAsync("SendRequest", OverallInfo.Period.TotalSeconds.ToString());
-                client.SendAsync("Send", string.Format(requestMessageFormat, OverallInfo.Period));
                 await Task.Delay(OverallInfo.Period);
             }
 
